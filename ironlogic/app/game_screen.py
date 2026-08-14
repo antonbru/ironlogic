@@ -115,13 +115,15 @@ class GameScreen(QWidget):
         self.map_combo.addItems(list(PRESETS))
         map_row.addWidget(self.map_combo)
         map_row.addWidget(QLabel("Seed:"))
-        self.seed_edit = QLineEdit("42")
-        self.seed_edit.setFixedWidth(60)
+        self.seed_edit = QLineEdit()
+        self.seed_edit.setFixedWidth(70)
+        self.seed_edit.setReadOnly(True)
+        self.seed_edit.setToolTip(
+            "Seed последнего боя. Каждый бой начинается с нового случайного "
+            "расположения; реплей сохраняется в ~/.ironlogic/battle.json"
+        )
+        self._randomize_seed()
         map_row.addWidget(self.seed_edit)
-        dice = QPushButton("🎲")
-        dice.setFixedWidth(36)
-        dice.clicked.connect(lambda: self.seed_edit.setText(str(random.randint(0, 9999))))
-        map_row.addWidget(dice)
         lay.addLayout(map_row)
 
         ticks_row = QHBoxLayout()
@@ -193,6 +195,10 @@ class GameScreen(QWidget):
         return panel
 
     # --- Выбор роботов ------------------------------------------------------
+    def _randomize_seed(self) -> None:
+        """Новый случайный seed — каждый бой начинается по-другому."""
+        self.seed_edit.setText(str(random.randint(1, 99999)))
+
     def refresh_bots(self) -> None:
         self.bot_list.clear()
         all_bots = list(EXAMPLES_DIR.glob("*.py"))
@@ -259,10 +265,12 @@ class GameScreen(QWidget):
             except Exception as exc:  # noqa: BLE001
                 QMessageBox.warning(self, "Ошибка компиляции", str(exc))
                 return
+        self._randomize_seed()  # каждый бой — новое расположение
         self.load_battle(self._collect_config())
 
     def quick_battle(self) -> None:
         ensure_template_bot()
+        self._randomize_seed()
         for i in range(self.bot_list.count()):
             self.bot_list.item(i).setCheckState(Qt.CheckState.Unchecked)
         found = 0
