@@ -21,7 +21,7 @@ def _run() -> None:
             sys.exit(1)
         run_gui()
     else:
-        main()
+        sys.exit(main())
 
 
 if __name__ == "__main__":
