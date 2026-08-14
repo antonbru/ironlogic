@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
@@ -23,13 +24,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ironlogic import paths
+from ironlogic.app.code_editor import CodeEditor
 from ironlogic.botapi.loader import load_bot
 from ironlogic.engine.mapgen import PRESETS
 
-ROOT = Path(__file__).resolve().parent.parent
-BOTS_DIR = ROOT / "bots"
-EXAMPLES_DIR = ROOT / "examples"
-TEMPLATE_BOT = ROOT / "template_bot.py"
+BOTS_DIR = paths.bots_dir()
+EXAMPLES_DIR = paths.examples_dir()
+TEMPLATE_BOT = paths.template_bot_path()
 
 TEMPLATE_TEXT = TEMPLATE_BOT.read_text(encoding="utf-8") if TEMPLATE_BOT.exists() else ""
 
@@ -92,8 +94,12 @@ class LauncherWidget(QWidget):
         refresh_btn.clicked.connect(self.refresh_bots)
         self.check_btn = QPushButton("✅ проверить")
         self.check_btn.clicked.connect(self.check_selected)
+        edit_btn = QPushButton("✏️ Редактор бота")
+        edit_btn.setToolTip("Открыть выбранного робота (или мой шаблон) в редакторе")
+        edit_btn.clicked.connect(self.open_editor)
         bots_row.addWidget(refresh_btn)
         bots_row.addWidget(self.check_btn)
+        bots_row.addWidget(edit_btn)
         bots_row.addStretch()
         layout.addLayout(bots_row)
 
@@ -201,6 +207,52 @@ class LauncherWidget(QWidget):
                 self.bot_list.item(i).setCheckState(Qt.CheckState.Checked)
         self.map_combo.setCurrentText("arena")
         self.battle_requested.emit(self._collect_config())
+
+    def open_editor(self) -> None:
+        """Открывает выбранного робота (или шаблон) во встроенном редакторе."""
+        selected = self.selected_bots()
+        path = Path(selected[0]) if selected else ensure_template_bot()
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Редактор: {path.name}")
+        dialog.resize(720, 560)
+        layout = QVBoxLayout(dialog)
+
+        editor = CodeEditor(dialog)
+        try:
+            editor.setPlainText(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            QMessageBox.warning(self, "Не удалось открыть", str(exc))
+            return
+
+        hint = QLabel(f"Файл: {path}")
+        hint.setStyleSheet("color: #8b949e;")
+        layout.addWidget(hint)
+        layout.addWidget(editor, stretch=1)
+
+        buttons = QHBoxLayout()
+        save_btn = QPushButton("💾 Сохранить")
+        save_btn.setStyleSheet("background: #238636; padding: 6px 16px;")
+        cancel_btn = QPushButton("Отмена")
+
+        def save() -> None:
+            try:
+                path.write_text(editor.toPlainText(), encoding="utf-8")
+            except OSError as exc:
+                QMessageBox.warning(dialog, "Не удалось сохранить", str(exc))
+                return
+            dialog.accept()
+            self.refresh_bots()
+            self.errors_label.setText(f"✅ Сохранено: {path}")
+
+        save_btn.clicked.connect(save)
+        cancel_btn.clicked.connect(dialog.reject)
+        buttons.addStretch()
+        buttons.addWidget(cancel_btn)
+        buttons.addWidget(save_btn)
+        layout.addLayout(buttons)
+
+        dialog.exec()
 
     def open_replay(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Открыть реплей", "", "Battle JSON (*.json)")
