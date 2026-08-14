@@ -1,13 +1,23 @@
-"""API ботов IronLogic (реализация — Фаза 2)."""
+"""API ботов IronLogic: конфигурация Robot и константы клеток."""
 
 from __future__ import annotations
+
+from ironlogic.botapi.robot import RobotAPI  # noqa: F401
+from ironlogic.botapi.loader import LoadedBot, load_bot  # noqa: F401
+from ironlogic.botapi.errors import (  # noqa: F401
+    BotCompileError,
+    BotRuntimeError,
+    BudgetError,
+)
 
 
 class Robot:
     """Конфигурация робота (железо).
 
-    Полная реализация появляется в Фазе 2. Здесь — каркас, чтобы
-    ``ironlogic_api`` импортировался и пакет собирался уже в Фазе 0.
+    Параметры:
+        name: имя робота (показывается в бою).
+        front/right/back/left: слоты аппаратуры ('eye', 'cannon' или 'empty').
+        radar: наличие радара (bool).
     """
 
     def __init__(
@@ -39,6 +49,12 @@ UNKNOWN = "UNKNOWN"
 
 __all__ = [
     "Robot",
+    "RobotAPI",
+    "LoadedBot",
+    "load_bot",
+    "BotCompileError",
+    "BotRuntimeError",
+    "BudgetError",
     "EMPTY",
     "STONE",
     "PIT",
