@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 from ironlogic import paths
 from ironlogic.app.code_editor import CodeEditor
 from ironlogic.botapi.loader import load_bot
+from ironlogic.config import GUI_MAP_SIZE
 from ironlogic.engine.mapgen import PRESETS
 
 BOTS_DIR = paths.bots_dir()
@@ -162,12 +163,17 @@ class LauncherWidget(QWidget):
         ]
 
     def _collect_config(self) -> dict:
-        return {
+        cfg = {
             "map": self.map_combo.currentText(),
             "seed": int(self.seed_edit.text() or "42"),
             "max_ticks": self.ticks_spin.value(),
             "bots": self.selected_bots(),
         }
+        # Компактная карта для боя до 2 роботов: боты быстрее встречаются.
+        if len(cfg["bots"]) <= 2:
+            cfg["width"] = GUI_MAP_SIZE
+            cfg["height"] = GUI_MAP_SIZE
+        return cfg
 
     def check_selected(self) -> None:
         errors = []

@@ -6,7 +6,16 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-from ironlogic.engine.cells import AMMO, EMPTY, PIT, REACTOR, RECHARGE, STONE
+from ironlogic.engine.cells import (
+    AMMO,
+    EMPTY,
+    PIT,
+    REACTOR,
+    RECHARGE,
+    STONE,
+    abs_dir,
+    vector,
+)
 
 CELL_COLORS: dict[int, QColor] = {
     EMPTY: QColor("#161b22"),
@@ -16,6 +25,10 @@ CELL_COLORS: dict[int, QColor] = {
     AMMO: QColor("#ffd700"),
     RECHARGE: QColor("#2ea043"),
 }
+
+# Маркеры аппаратуры робота: глаз — точка, пушка — ствол.
+EYE_COLOR = QColor("#58a6ff")
+CANNON_COLOR = QColor("#ffa657")
 
 ROBOT_COLORS = [
     QColor("#ff5555"),
@@ -81,7 +94,10 @@ class ArenaWidget(QWidget):
                 color = QColor("#6e7681")
             if self.damage_flash.get(robot.id, 0) > 0:
                 color = QColor("#ffffff")
-            self._draw_robot(painter, robot.x, robot.y, robot.dir, color, origin_x, origin_y)
+            self._draw_robot(
+                painter, robot.x, robot.y, robot.dir, color,
+                origin_x, origin_y, getattr(robot, "hardware", {}),
+            )
 
         pen = QPen(QColor("#ffe66d"), 2)
         painter.setPen(pen)
@@ -91,7 +107,7 @@ class ArenaWidget(QWidget):
             cy = origin_y + proj.y * self._cell + self._cell / 2
             painter.drawEllipse(QRectF(cx - 3, cy - 3, 6, 6))
 
-    def _draw_robot(self, painter, x, y, direction, color, ox, oy) -> None:
+    def _draw_robot(self, painter, x, y, direction, color, ox, oy, hardware=None) -> None:
         c = self._cell
         rect = QRectF(ox + x * c + 2, oy + y * c + 2, c - 4, c - 4)
         painter.setPen(QPen(color, 2))
@@ -114,3 +130,21 @@ class ArenaWidget(QWidget):
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPolygon(pts)
+
+        # Аппаратура: глаз — точка, пушка — ствол на соответствующей стороне.
+        if hardware:
+            for rel, slot in hardware.items():
+                dx, dy = vector(abs_dir(direction, rel))
+                side_x = cx + dx * (rect.width() / 2 - 3)
+                side_y = cy + dy * (rect.height() / 2 - 3)
+                if slot == "eye":
+                    painter.setPen(QPen(QColor("#0d1117"), 1))
+                    painter.setBrush(EYE_COLOR)
+                    painter.drawEllipse(QPointF(side_x, side_y), 2.5, 2.5)
+                elif slot == "cannon":
+                    painter.setPen(QPen(CANNON_COLOR, 3))
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.drawLine(
+                        QPointF(side_x - dx * 3, side_y - dy * 3),
+                        QPointF(side_x + dx * 3, side_y + dy * 3),
+                    )

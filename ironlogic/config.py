@@ -8,9 +8,12 @@
 DEFAULT_MAX_TICKS = 10_000
 """Максимальное число тактов в бою по умолчанию."""
 
+GUI_MAP_SIZE = 16
+"""Компактный размер карты в GUI для боя до 2 роботов (квадрат)."""
+
 # --- Робот ----------------------------------------------------------------
 ROBOT_START_HEALTH = 100
-ROBOT_START_ENERGY = 100
+ROBOT_START_ENERGY = 300
 ROBOT_START_AMMO = 5
 ROBOT_MAX_AMMO = 20
 

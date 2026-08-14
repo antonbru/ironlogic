@@ -102,7 +102,11 @@ class BattleScreen(QWidget):
 
         loaded = [load_bot(p) for p in config["bots"]]
         battle_config = BattleConfig(
-            map_preset=config["map"], seed=config["seed"], max_ticks=config["max_ticks"]
+            map_preset=config["map"],
+            seed=config["seed"],
+            max_ticks=config["max_ticks"],
+            width=config.get("width"),
+            height=config.get("height"),
         )
         runner = BattleRunner(battle_config, loaded_bots=loaded)
         result = runner.run()
