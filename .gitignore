@@ -1,0 +1,22 @@
+# Виртуальное окружение
+.venv/
+venv/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Результаты боев и временные файлы
+battle.json
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
