@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ironlogic.engine.arena import Arena
-from ironlogic.engine.cells import ROBOT
+from ironlogic.engine.cells import ROBOT, vector
 from ironlogic.engine.robot import RobotState
 
 from ironlogic.app.arena_widget import ArenaWidget
@@ -35,6 +35,7 @@ class BattleScreen(QWidget):
         self.index = 0
         self.paused = False
         self.speed = 1
+        self.projectiles: dict[int, tuple[int, int, int]] = {}  # id -> (x, y, owner)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._advance)
         self._build_ui()
@@ -143,9 +144,9 @@ class BattleScreen(QWidget):
                 id=i,
                 name=rdata["name"],
                 file=rdata.get("file", ""),
-                x=rdata["start"]["x"],
-                y=rdata["start"]["y"],
-                dir=rdata["start"]["dir"],
+                x=rdata["x"],
+                y=rdata["y"],
+                dir=rdata["dir"],
                 hardware=dict(rdata.get("hardware", {})),
                 radar=bool(rdata.get("radar", False)),
             )
@@ -232,16 +233,32 @@ class BattleScreen(QWidget):
             robot = self._robot(event.get("robot"))
             if robot:
                 robot.ammo = max(0, robot.ammo - 1)
+                dx, dy = vector(event.get("dir", robot.dir))
+                self.projectiles[event["projectile"]] = (robot.x + dx, robot.y + dy, robot.id)
+        elif t == "projectile_move":
+            pid = event.get("projectile")
+            if pid in self.projectiles:
+                x, y = event["to"]
+                owner = self.projectiles[pid][2]
+                self.projectiles[pid] = (x, y, owner)
+        elif t == "miss":
+            self.projectiles.pop(event.get("projectile"), None)
         elif t == "hit":
             robot = self._robot(event.get("target"))
             if robot:
                 robot.health = event.get("health", robot.health)
                 self.arena_widget.damage_flash[robot.id] = 3
+                # Снаряд погиб, попав в робота на его клетке.
+                for pid in list(self.projectiles):
+                    if (self.projectiles[pid][0], self.projectiles[pid][1]) == (robot.x, robot.y):
+                        del self.projectiles[pid]
+                        break
         elif t == "destroyed":
             robot = self._robot(event.get("robot"))
             if robot:
                 robot.alive = False
                 self.arena.set(robot.x, robot.y, 0)
+            self.projectiles = {pid: p for pid, p in self.projectiles.items() if p[2] != event.get("robot")}
         elif t == "ammo_pickup":
             robot = self._robot(event.get("robot"))
             if robot:
@@ -278,10 +295,7 @@ class BattleScreen(QWidget):
         return None
 
     def _render(self) -> None:
-        projectiles = []
-        for event in self.events[: self.index]:
-            if event["type"] == "shoot":
-                projectiles.append(type("P", (), event | {"x": 0, "y": 0, "dir": "E"})())
+        projectiles = [type("P", (), {"x": x, "y": y})() for (x, y, _) in self.projectiles.values()]
         self.arena_widget.set_state(self.arena, self.robots, projectiles, self.arena_widget.damage_flash)
         hud_lines = []
         for robot in self.robots:
