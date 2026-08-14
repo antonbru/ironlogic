@@ -10,23 +10,47 @@ from ironlogic_api import Robot
 
 # Конфигурация робота (железо)
 robot = Robot(
-    name="Wanderer",
+    name="МойРобот",
     front="eye",        # глаз смотрит вперёд
-    right="empty",      # справа ничего
+    right="eye",        # глаз справа
     back="eye",         # глаз сзади
     left="cannon",      # пушка слева
-    radar=False,        # радара нет
+    radar=True,         # радар видит врага на расстоянии
 )
+
+radar_on = False
 
 # Программа поведения - вызывается каждый такт
 def on_tick(r):
-    if r.eye("front") == "ROBOT":
-        r.shoot("front")
+    global radar_on
+    if not radar_on:
+        r.radar_on()
+        radar_on = True
+        return
+    target = r.radar("ROBOT", 20)
+    if target is not None:
+        dist, direction = target
+        if direction == "left" and dist <= 1:
+            r.shoot("left")          # враг вплотную слева - точный выстрел!
+            return
+        if direction == "front" and dist <= 1:
+            r.turn("right")          # враг вплотную спереди - берём на прицел
+            return
+        if direction == "front":
+            if r.eye("front") in ("EMPTY", "AMMO"):
+                r.move("forward")    # враг впереди - едем на него
+            else:
+                r.turn("right")      # стена/яма - объезжаем
+            return
+        r.turn(direction if direction in ("left", "right") else "left")
         return
     if r.eye("front") in ("EMPTY", "AMMO"):
         r.move("forward")
         return
-    r.turn("left")
+    if r.eye("front") in ("STONE", "PIT"):
+        r.turn("right")
+        return
+    r.wait()
 ```
 
 Обязательные элементы:

@@ -205,7 +205,7 @@ class BattleRunner:
 
         api = RobotAPI(self._world, robot)
         try:
-            run_in_sandbox(loaded.on_tick, api)
+            run_in_sandbox(loaded.on_tick, api, bot_file=loaded.path)
         except BudgetError as exc:
             self.events.append(
                 Event("budget_exceeded", t=self.tick, robot=robot.id, message=str(exc))

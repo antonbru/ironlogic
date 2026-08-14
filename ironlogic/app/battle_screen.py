@@ -33,7 +33,8 @@ class BattleScreen(QWidget):
         super().__init__(parent)
         self.events: list[dict] = []
         self.index = 0
-        self.paused = False
+        self.paused = True
+        self.started = False
         self.speed = 1
         self.projectiles: dict[int, tuple[int, int, int]] = {}  # id -> (x, y, owner)
         self.timer = QTimer(self)
@@ -67,9 +68,13 @@ class BattleScreen(QWidget):
         root.addLayout(body, stretch=1)
 
         buttons = QHBoxLayout()
-        self.pause_btn = QPushButton("⏸ Пауза (Space)")
-        self.pause_btn.clicked.connect(self.toggle_pause)
-        buttons.addWidget(self.pause_btn)
+        self.start_btn = QPushButton("▶ СТАРТ")
+        self.start_btn.setStyleSheet(
+            "background: #238636; color: white; font-size: 16px;"
+            "padding: 8px 26px; border-radius: 8px; font-weight: bold;"
+        )
+        self.start_btn.clicked.connect(self.start_or_toggle)
+        buttons.addWidget(self.start_btn)
         for s in (1, 4, 16, 0):
             btn = QPushButton(f"×{s if s else 'MAX'}")
             btn.clicked.connect(lambda _=False, sp=s: self.set_speed(sp))
@@ -92,7 +97,6 @@ class BattleScreen(QWidget):
             with open(config["replay"], "r", encoding="utf-8") as fh:
                 data = json.load(fh)
             self._setup(data)
-            self.timer.start(SPEED_MS[self.speed])
             return
 
         # Полный бой headless заранее
@@ -116,7 +120,6 @@ class BattleScreen(QWidget):
         out = Path("battle.json")
         with open(out, "w", encoding="utf-8") as fh:
             json.dump(battle_to_dict(result), fh, ensure_ascii=False, indent=2)
-        self.timer.start(SPEED_MS[self.speed])
 
     def _setup(self, data: dict) -> None:
         """Восстанавливает состояние по событиям."""
@@ -124,7 +127,8 @@ class BattleScreen(QWidget):
         self.robots_data = data["robots"]
         self.events = data.get("events", [])
         self.index = 0
-        self.paused = False
+        self.paused = True
+        self.started = False
         self.speed = 1
         self._make_arena()
         self.tick_label.setText("Такт: 0")
@@ -132,6 +136,7 @@ class BattleScreen(QWidget):
         self.timer.setInterval(SPEED_MS[1])
         self._apply_spawns()
         self._render()
+        self._update_start_btn()
 
     def _make_arena(self) -> None:
         w = self.map_data["width"]
@@ -158,21 +163,50 @@ class BattleScreen(QWidget):
             self.arena.set(robot.x, robot.y, ROBOT)
 
     # --- Управление --------------------------------------------------------
+    def _update_start_btn(self) -> None:
+        """Текст и стиль кнопки старта по текущему состоянию."""
+        if not self.started:
+            label = "▶ Заново (R)" if self.index >= len(self.events) else "▶ СТАРТ"
+            self.start_btn.setText(label)
+            self.start_btn.setStyleSheet(
+                "background: #238636; color: white; font-size: 16px;"
+                "padding: 8px 26px; border-radius: 8px; font-weight: bold;"
+            )
+        else:
+            self.start_btn.setText("▶ Продолжить" if self.paused else "⏸ Пауза")
+            self.start_btn.setStyleSheet("")
+
+    def start_or_toggle(self) -> None:
+        """СТАРТ, а затем пауза/продолжение."""
+        if not self.started:
+            if self.index >= len(self.events):
+                self.restart()
+            self.started = True
+            self.paused = False
+            self.timer.start(SPEED_MS[self.speed])
+        else:
+            self.toggle_pause()
+        self._update_start_btn()
+
     def toggle_pause(self) -> None:
         self.paused = not self.paused
-        self.pause_btn.setText("▶ Продолжить (Space)" if self.paused else "⏸ Пауза (Space)")
         if self.paused:
             self.timer.stop()
         else:
             self.timer.start(SPEED_MS[self.speed])
+        self._update_start_btn()
 
     def set_speed(self, speed: int) -> None:
         self.speed = speed
-        if not self.paused:
+        if self.started and not self.paused:
             self.timer.start(SPEED_MS[speed])
 
     def restart(self) -> None:
+        self.timer.stop()
         self._setup(self._battle_data() if hasattr(self, "map_data") else {"map": self.map_data, "robots": self.robots_data, "events": self.events})
+        self.started = False
+        self.paused = True
+        self._update_start_btn()
 
     def _battle_data(self) -> dict:
         return {
@@ -187,7 +221,7 @@ class BattleScreen(QWidget):
     def keyPressEvent(self, event) -> None:  # noqa: N802
         key = event.key()
         if key == Qt.Key.Key_Space:
-            self.toggle_pause()
+            self.start_or_toggle()
         elif key == Qt.Key.Key_R:
             self.restart()
         elif key == Qt.Key.Key_Escape:
@@ -208,6 +242,8 @@ class BattleScreen(QWidget):
         if self.index >= len(self.events):
             self.timer.stop()
             self.paused = True
+            self.started = False
+            self._update_start_btn()
             return
         event = self.events[self.index]
         self._apply_event(event)

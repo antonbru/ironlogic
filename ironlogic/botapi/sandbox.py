@@ -77,15 +77,28 @@ def build_globals(extra: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 class _InstructionBudget:
-    """Счётчик «инструкций» такта через sys.settrace."""
+    """Счётчик «инструкций» такта через sys.settrace.
 
-    def __init__(self, budget: int = INSTRUCTION_BUDGET, max_depth: int = MAX_RECURSION_DEPTH) -> None:
+    Если задан ``bot_file``, считаются только кадры самого файла бота —
+    внутренности движка и API (например, сканирование радара) не должны
+    отнимать у бота бюджет «на мышление».
+    """
+
+    def __init__(
+        self,
+        budget: int = INSTRUCTION_BUDGET,
+        max_depth: int = MAX_RECURSION_DEPTH,
+        bot_file: str | None = None,
+    ) -> None:
         self.budget = budget
         self.max_depth = max_depth
+        self.bot_file = bot_file
         self.count = 0
         self.depth = 0
 
     def tracer(self, frame: Any, event: str, arg: Any) -> Callable[..., Any] | None:
+        if self.bot_file is not None and frame.f_code.co_filename != self.bot_file:
+            return None  # не трассируем кадры движка/API
         if event == "call":
             self.depth += 1
         elif event == "return":
@@ -98,14 +111,22 @@ class _InstructionBudget:
         return self.tracer
 
 
-def run_in_sandbox(func: Callable[..., Any], *args: Any, globals_: dict[str, Any] | None = None) -> Any:
+def run_in_sandbox(
+    func: Callable[..., Any],
+    *args: Any,
+    globals_: dict[str, Any] | None = None,
+    bot_file: str | None = None,
+) -> Any:
     """Исполняет ``func(*args)`` в песочнице с бюджетом инструкций и лимитом рекурсии.
+
+    ``bot_file`` — путь к файлу бота: если задан, бюджет считает только
+    инструкции этого файла (см. ``_InstructionBudget``).
 
     Возвращает результат функции. При превышении бюджета/рекурсии бросает
     ``BudgetError``; при любой другой ошибке исполнения — ``BotRuntimeError``
     с текстом исключения.
     """
-    budget = _InstructionBudget()
+    budget = _InstructionBudget(bot_file=bot_file)
     prev_trace = sys.gettrace()
     try:
         sys.settrace(budget.tracer)
