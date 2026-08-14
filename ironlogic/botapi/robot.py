@@ -61,8 +61,10 @@ class RobotAPI:
     def radar(self, kind: str, radius: int) -> tuple[int, str] | None:
         """Ближайший объект типа ``kind``: (расстояние, направление) или None.
 
-        Порядок сканирования фиксированный: по возрастанию евклидова
-        расстояния, затем строка, затем колонка (для детерминизма).
+        Расстояние — манхэттенское (``|dx| + |dy|``): дистанция 1 означает
+        соседнюю клетку ровно в возвращаемом направлении. Порядок
+        сканирования фиксированный: по возрастанию расстояния, затем
+        строка, затем колонка (для детерминизма).
         """
         if not self._robot.radar or not self._robot.radar_active:
             self._world.log_script(self._robot.id, "radar: радар отсутствует или выключен")
@@ -84,14 +86,11 @@ class RobotAPI:
             for x in range(max(0, rx - radius), min(self._world.arena.width - 1, rx + radius) + 1):
                 if (x, y) == (rx, ry):
                     continue
-                dist_sq = (x - rx) ** 2 + (y - ry) ** 2
-                if dist_sq > radius * radius:
+                dist = abs(x - rx) + abs(y - ry)
+                if dist > radius:
                     continue
                 if kind_at(x, y) != kind:
                     continue
-                dist = int(dist_sq ** 0.5)
-                if dist == 0:
-                    dist = 1
                 found.append((dist, y, x))
 
         if not found:

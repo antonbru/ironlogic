@@ -1,40 +1,52 @@
-# Scavenger — сборщик. Собирает патроны, стоит на розетках, избегает ям.
+# Scavenger — сборщик. Собирает патроны и заряжается на розетках,
+# а если враг подобрался вплотную — защищается из пушки справа.
 from ironlogic_api import Robot
 
 robot = Robot(
     name="Scavenger",
-    front="eye",
-    right="cannon",
-    back="eye",
-    left="eye",
-    radar=False,
+    front="eye",      # глаз спереди
+    right="cannon",   # пушка справа — защита
+    back="eye",       # глаз сзади
+    left="eye",       # глаз слева
+    radar=True,       # радар ищет и врага, и припасы
 )
 
-# Запоминаем, куда идём: True — ищем патроны, False — ищем розетку
-seek_ammo = True
+radar_on = False
 
 
 def on_tick(r):
-    global seek_ammo
+    global radar_on
+    if not radar_on:
+        r.radar_on()
+        radar_on = True
+        return
 
-    # Уже стоим на розетке — отдыхаем и заряжаемся
-    if r.eye("front") != "RECHARGE" and r.tick() > 0:
-        # Проверяем текущую клетку: если мы на RECHARGE, просто ждём
-        pass
+    # Оборона: враг вплотную справа — стреляем, спереди — берём на прицел.
+    enemy = r.radar("ROBOT", 6)
+    if enemy is not None:
+        dist, direction = enemy
+        if direction == "right" and dist <= 1:
+            r.shoot("right")
+            return
+        if direction == "front" and dist <= 1:
+            r.turn("left")           # враг окажется справа
+            return
 
-    target_kind = "AMMO" if seek_ammo else "RECHARGE"
-    found = r.eye("front")
-    if found in (target_kind, "EMPTY"):
+    # Сбор: пока патронов мало — ищем ящики, потом — розетку.
+    kind = "AMMO" if r.ammo() <= 10 else "RECHARGE"
+    supply = r.radar(kind, 20)
+    if supply is not None:
+        dist, direction = supply
+        if direction == "front":
+            if r.eye("front") in ("EMPTY", "AMMO", "RECHARGE"):
+                r.move("forward")
+            else:
+                r.turn("right")
+            return
+        r.turn(direction if direction in ("left", "right") else "left")
+        return
+
+    if r.eye("front") in ("EMPTY", "AMMO"):
         r.move("forward")
         return
-    if found == "PIT" or found == "STONE":
-        r.turn("right")
-        return
-    # Патроны кончились или полные — сменить цель
-    if r.ammo() <= 2:
-        seek_ammo = True
-    elif r.ammo() >= 18:
-        seek_ammo = False
-    r.wait()
-
-# TODO: полная реализация охоты за патронами/розетками через сенсоры в Фазе 2
+    r.turn("right")

@@ -1,7 +1,15 @@
-# Hunter — охотник. Радар ищет врага, едет к нему, стреляет, уходит от ям.
+# Hunter — охотник. Радар на 20 клеток: доворачивает врага на прицел
+# (справа), стреляет с дистанции до 2, объезжает стены и ямы.
 from ironlogic_api import Robot
 
-robot = Robot(name="Hunter", front="cannon", right="eye", back="eye", left="eye", radar=True)
+robot = Robot(
+    name="Hunter",
+    front="eye",      # глаз спереди — видим, куда едем
+    right="cannon",   # пушка справа — прицел
+    back="eye",       # глаз сзади
+    left="eye",       # глаз слева
+    radar=True,       # радар видит врага на расстоянии
+)
 
 radar_on = False
 
@@ -12,21 +20,26 @@ def on_tick(r):
         r.radar_on()
         radar_on = True
         return
+
     target = r.radar("ROBOT", 20)
     if target is not None:
         dist, direction = target
-        if direction == "front":
-            # Враг прямо по курсу — стреляем
-            r.shoot("front")
+        if direction == "right" and dist <= 2:
+            r.shoot("right")         # враг в прицеле — огонь!
             return
-        # Враг сбоку/сзади — поворачиваем в его сторону
-        r.turn(direction)
+        if direction == "front":
+            if dist <= 1:
+                r.turn("left")       # враг вплотную — берём на прицел
+            elif r.eye("front") in ("EMPTY", "AMMO"):
+                r.move("forward")    # враг впереди — едем на него
+            else:
+                r.turn("right")      # стена или яма — объезжаем
+            return
+        r.turn(direction if direction in ("left", "right") else "left")
         return
-    # Нет цели — блуждаем и избегаем ям
-    if r.eye("front") == "STONE":
-        r.turn("right")
+
+    # Врага не видно — патрулируем
+    if r.eye("front") in ("EMPTY", "AMMO"):
+        r.move("forward")
         return
-    if r.eye("front") == "PIT":
-        r.turn("left")
-        return
-    r.move("forward")
+    r.turn("right")

@@ -1,13 +1,12 @@
-"""Главное окно GUI IronLogic: тёмная неоновая тема, лаунчер ↔ бой."""
+"""Главное окно GUI IronLogic: тёмная неоновая тема, единый экран игры."""
 
 from __future__ import annotations
 
 import sys
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
+from PySide6.QtWidgets import QApplication, QMainWindow
 
-from ironlogic.app.launcher import LauncherWidget
-from ironlogic.app.battle_screen import BattleScreen
+from ironlogic.app.game_screen import GameScreen
 
 DARK_QSS = """
 QWidget {
@@ -44,35 +43,13 @@ QSS_ACCENTS = {
 
 
 class MainWindow(QMainWindow):
-    """Главное окно приложения."""
+    """Главное окно приложения: выбор роботов, арена и управление в одном окне."""
 
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("IronLogic — Железная Логика")
         self.resize(1280, 800)
-
-        self.stack = QStackedWidget()
-        self.setCentralWidget(self.stack)
-
-        self.launcher = LauncherWidget()
-        self.battle_screen = BattleScreen()
-
-        self.stack.addWidget(self.launcher)
-        self.stack.addWidget(self.battle_screen)
-
-        self.launcher.battle_requested.connect(self.start_battle)
-        self.battle_screen.back_requested.connect(self.go_launcher)
-
-        self.stack.setCurrentWidget(self.launcher)
-
-    def start_battle(self, config: dict) -> None:
-        self.stack.setCurrentWidget(self.battle_screen)
-        self.battle_screen.load_battle(config)
-        self.battle_screen.setFocus()
-
-    def go_launcher(self) -> None:
-        self.battle_screen.timer.stop()
-        self.stack.setCurrentWidget(self.launcher)
+        self.setCentralWidget(GameScreen())
 
 
 def run_gui() -> None:
