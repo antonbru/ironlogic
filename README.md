@@ -83,6 +83,17 @@ def on_tick(r):
 .venv/bin/pytest
 ```
 
+## Сборка приложения (.app)
+
+```bash
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/pyinstaller ironlogic.spec --noconfirm
+open dist/IronLogic.app
+```
+
+В собранном приложении read-only ресурсы (примеры, шаблон) берутся из бандла,
+а личные боты хранятся в `~/.ironlogic/`.
+
 ## Структура проекта
 
 ```
