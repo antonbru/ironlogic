@@ -10,6 +10,7 @@ from PyInstaller.utils.hooks import collect_submodules
 datas = [
     ("examples", "examples"),
     ("ironlogic/template_bot.py", "."),
+    ("ironlogic_api.py", "."),
 ]
 
 hiddenimports = collect_submodules("ironlogic")
